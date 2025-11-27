@@ -597,6 +597,20 @@ class _InventoryBrowserAppBarState extends State<InventoryBrowserAppBar> {
                             final filename =
                                 "${record.id.split("-")[1]}-${record.formattedName}${p.extension(uri)}";
                             try {
+                              // Check if file already exists
+                              final targetFile = File("$directory/$filename");
+                              if (targetFile.existsSync()) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text("File already exists: ${record.formattedName}"),
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
+                                continue; // Skip this file
+                              }
+
                               final downloadTask = DownloadTask(
                                 url: Aux.resdbToHttp(uri),
                                 allowPause: true,
@@ -604,14 +618,17 @@ class _InventoryBrowserAppBarState extends State<InventoryBrowserAppBar> {
                                 filename: filename,
                                 updates: Updates.statusAndProgress,
                               );
-                              final downloadStatus =
-                                  await FileDownloader().download(downloadTask);
-                              if (downloadStatus.status ==
-                                  TaskStatus.complete) {
-                                final tempDirectory =
-                                    await _tempDirectoryFuture;
-                                final file = File(
-                                    "${tempDirectory.path}/${record.id.split("-")[1]}-${record.formattedName}${p.extension(uri)}");
+                              
+                              // Add timeout to prevent freezing
+                              final downloadStatus = await FileDownloader()
+                                  .download(downloadTask)
+                                  .timeout(const Duration(minutes: 5), onTimeout: () {
+                                throw "Download timed out after 5 minutes";
+                              });
+                              
+                              if (downloadStatus.status == TaskStatus.complete) {
+                                final tempDirectory = await _tempDirectoryFuture;
+                                final file = File("${tempDirectory.path}/${record.id.split("-")[1]}-${record.formattedName}${p.extension(uri)}");
                                 if (file.existsSync()) {
                                   final newFile = File("$directory/$filename");
                                   await file.copy(newFile.absolute.path);
@@ -628,6 +645,8 @@ class _InventoryBrowserAppBarState extends State<InventoryBrowserAppBar> {
                                   throw downloadStatus.exception ??
                                       "Unknown Error";
                                 }
+                              } else {
+                                throw downloadStatus.exception ?? "Download failed";
                               }
                             } catch (e, s) {
                               FlutterError.reportError(
