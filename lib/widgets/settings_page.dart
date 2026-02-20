@@ -5,6 +5,21 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:recon/client_holder.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+/// Formats version and build number for display. If [buildNumber] looks like a
+/// Unix timestamp (9–10 digits), appends a readable date (e.g. " · 2025-02-20 12:34").
+String _formatVersionWithBuild(String version, String buildNumber) {
+  if (buildNumber.isEmpty) return version;
+  final digits = buildNumber.trim();
+  if (digits.length >= 9 && digits.length <= 10 && int.tryParse(digits) != null) {
+    final sec = int.tryParse(digits);
+    if (sec != null && sec > 0) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(sec * 1000, isUtc: true).toLocal();
+      return '$version · ${DateFormat.yMMMd().add_Hm().format(dt)}';
+    }
+  }
+  return '$version+$buildNumber';
+}
+
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
@@ -83,7 +98,8 @@ class SettingsPage extends StatelessWidget {
             trailing: const Icon(Icons.info_outline),
             title: const Text("About ReCon"),
             onTap: () async {
-              final version = (await PackageInfo.fromPlatform()).version;
+              final info = await PackageInfo.fromPlatform();
+              final version = _formatVersionWithBuild(info.version, info.buildNumber);
               if (context.mounted) {
                 showAboutDialog(
                   context: context,

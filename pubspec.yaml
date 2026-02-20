@@ -16,7 +16,10 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-# Version name (0.13.0-dev) + build number: bump the +N for each test build so you can tell builds apart.
+# Version name (0.13.0-dev) + build number. For dev builds use a Unix timestamp so each
+# build is unique and encodes when it was built, e.g.:
+#   flutter build linux --build-name=0.13.0-dev --build-number=$(date +%s)
+# Or run: ./scripts/build_dev.sh linux
 version: 0.13.0-dev+1
 
 environment:

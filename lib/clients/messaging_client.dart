@@ -446,9 +446,6 @@ class MessagingClient extends ChangeNotifier {
   }
 
   void _showFriendCameOnline(Friend friend) {
-    if (!_settingsClient.currentSettings.notificationsDenied.valueOrDefault) {
-      _notificationClient.showFriendCameOnlineNotification(friend);
-    }
     _showCameOnlineSnackBar(friend);
   }
 
