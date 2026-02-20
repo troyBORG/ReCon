@@ -14,8 +14,10 @@ class AudioCacheClient {
 
   Future<File> cachedNetworkAudioFile(AudioClipContent clip) async {
     final directory = await _directoryFuture;
-    final fileName = basenameWithoutExtension(clip.assetUri);
-    final file = File("${directory.path}/$fileName.ogg");
+    final baseName = basenameWithoutExtension(clip.assetUri);
+    final ext = extension(clip.assetUri);
+    final suffix = ext.isNotEmpty ? ext : ".m4a";
+    final file = File("${directory.path}/$baseName$suffix");
     if (!file.existsSync()) {
       await file.create(recursive: true);
       final response = await http.get(Uri.parse(Aux.resdbToHttp(clip.assetUri)));

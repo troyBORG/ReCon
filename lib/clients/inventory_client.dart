@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:recon/apis/record_api.dart';
 import 'package:recon/clients/api_client.dart';
 import 'package:recon/models/inventory/resonite_directory.dart';
 import 'package:recon/models/records/record.dart';
+import 'package:recon/utils/fuzzy_match.dart';
 
 enum SortMode {
   name,
@@ -49,8 +51,24 @@ class InventoryClient extends ChangeNotifier {
   Future<ResoniteDirectory>? _currentDirectory;
   SortMode _sortMode = SortMode.resonite;
   bool _sortReverse = false;
+  String _searchQuery = "";
 
   InventoryClient({required this.apiClient});
+
+  String get searchQuery => _searchQuery;
+
+  set searchQuery(String value) {
+    final trimmed = value.trim();
+    if (_searchQuery == trimmed) return;
+    _searchQuery = trimmed;
+    notifyListeners();
+  }
+
+  void clearSearch() {
+    if (_searchQuery.isEmpty) return;
+    _searchQuery = "";
+    notifyListeners();
+  }
 
   SortMode get sortMode => _sortMode;
 
@@ -120,6 +138,9 @@ class InventoryClient extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Path separator used by the API for [record] (backend may use \ or /).
+  static String _pathSep(String path) => path.contains('/') ? '/' : r'\';
+
   Future<List<Record>> _getDirectory(Record record) async {
     ResoniteDirectory? dir;
     try {
@@ -132,6 +153,7 @@ class InventoryClient extends ChangeNotifier {
         path: ResoniteDirectory.rootName,
       );
     } else {
+      final sep = _pathSep(record.path);
       if (record.recordType == RecordType.link) {
         if (record.isGroupRecord) {
           final linkRecord = await RecordApi.getGroupRecordByPath(
@@ -139,9 +161,10 @@ class InventoryClient extends ChangeNotifier {
             path: "root/${record.path}/${record.name}",
             groupId: record.linkOwnerId,
           );
+          final linkSep = _pathSep(linkRecord.path);
           records = await RecordApi.getGroupRecordsAt(
             apiClient,
-            path: "${linkRecord.path}\\${linkRecord.name}",
+            path: "${linkRecord.path}$linkSep${linkRecord.name}",
             groupId: linkRecord.ownerId,
           );
         } else {
@@ -150,15 +173,16 @@ class InventoryClient extends ChangeNotifier {
             recordId: record.linkRecordId,
             user: record.linkOwnerId,
           );
+          final linkSep = _pathSep(linkRecord.path);
           records = await RecordApi.getUserRecordsAt(
             apiClient,
-            path: "${linkRecord.path}\\${linkRecord.name}",
+            path: "${linkRecord.path}$linkSep${linkRecord.name}",
             user: linkRecord.ownerId,
           );
         }
       } else {
         records = await RecordApi.getUserRecordsAt(apiClient,
-            path: "${record.path}\\${record.name}", user: record.ownerId);
+            path: "${record.path}$sep${record.name}", user: record.ownerId);
       }
     }
     return records;
@@ -197,7 +221,14 @@ class InventoryClient extends ChangeNotifier {
     if (record.path.isEmpty) {
       return record.name;
     }
-    return "${record.path}\\${record.name}";
+    final sep = _pathSep(record.path);
+    return "${record.path}$sep${record.name}";
+  }
+
+  /// Human-readable path for a record (e.g. "Inventory / Folder / item").
+  String recordDisplayPath(Record record) {
+    final raw = _recordFullPath(record);
+    return raw.replaceAll(_pathSplitter, " / ");
   }
 
   Future<void> copySelectedRecordsTo(Record targetDirectory) async {
@@ -377,6 +408,67 @@ class InventoryClient extends ChangeNotifier {
     if (caughtError != null) {
       throw caughtError!;
     }
+  }
+
+  /// Navigate to the folder that contains [record] (opens that folder so the record is visible).
+  Future<void> navigateToContainingFolder(Record record) async {
+    final path = record.path.trim();
+    if (path.isEmpty) {
+      loadInventoryRoot();
+      notifyListeners();
+      return;
+    }
+    return navigateToPath(path);
+  }
+
+  /// Navigate so that [record] (a directory or link) is the current folder.
+  Future<void> navigateToRecordFolder(Record record) async {
+    final sep = record.path.isEmpty ? '' : _pathSep(record.path);
+    final path = record.path.isEmpty ? record.name : "${record.path}$sep${record.name}";
+    return navigateToPath(path.trim());
+  }
+
+  static final _pathSplitter = RegExp(r'[\\/]');
+
+  /// Navigate to the folder at [path] (e.g. "Inventory" or "Inventory\\Subfolder").
+  /// Used to open the folder containing a search result.
+  Future<void> navigateToPath(String path) async {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty || trimmed == ResoniteDirectory.rootName) {
+      loadInventoryRoot();
+      notifyListeners();
+      return;
+    }
+    final segments = trimmed.split(_pathSplitter);
+    if (segments.isEmpty || segments.first != ResoniteDirectory.rootName) {
+      loadInventoryRoot();
+      notifyListeners();
+      return;
+    }
+    Record current = Record.inventoryRoot();
+    final pathDirs = <ResoniteDirectory>[];
+    pathDirs.add(ResoniteDirectory(record: current, parent: null, children: []));
+    for (var i = 1; i < segments.length; i++) {
+      final children = await _getDirectory(current);
+      final name = segments[i];
+      final childRecord = children.where((r) => r.name == name).firstOrNull;
+      if (childRecord == null) {
+        loadInventoryRoot();
+        notifyListeners();
+        return;
+      }
+      current = childRecord;
+      final parentDir = pathDirs.last;
+      final childDir = ResoniteDirectory(record: current, parent: parentDir, children: []);
+      parentDir.children.add(childDir);
+      pathDirs.add(childDir);
+    }
+    final records = await _getDirectory(current);
+    pathDirs.last.children
+        .addAll(records.map((r) => ResoniteDirectory.fromRecord(record: r, parent: pathDirs.last)));
+    _currentDirectory = Future.value(pathDirs.last);
+    _ensureDirectorySorted();
+    notifyListeners();
   }
 
   Future<void> navigateUp({int times = 1}) async {

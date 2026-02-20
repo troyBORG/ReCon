@@ -83,6 +83,7 @@ These sharpen or extend ideas from the sections below.
 
 - **Idea:** Full-text or name/type search over the current directory (and optionally children), plus filters (e.g. “only images,” “only folders,” “modified in last week”).
 - **Value:** Large inventories become manageable from the app.
+- **Note:** ReCon only searches the current folder (no full-inventory crawl) to keep the app light.
 
 ### 3.2 Bulk operations in inventory
 

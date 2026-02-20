@@ -9,6 +9,7 @@ import 'package:recon/auxiliary.dart';
 import 'package:recon/clients/inventory_client.dart';
 import 'package:recon/models/inventory/resonite_directory.dart';
 import 'package:recon/models/records/record.dart';
+import 'package:recon/utils/fuzzy_match.dart';
 import 'package:recon/widgets/default_error_widget.dart';
 import 'package:recon/widgets/inventory/object_inventory_tile.dart';
 import 'package:recon/widgets/inventory/path_inventory_tile.dart';
@@ -75,7 +76,13 @@ class _InventoryBrowserState extends State<InventoryBrowser> with AutomaticKeepA
                       );
                     }
                     final directory = snapshot.data;
-                    final records = directory?.records ?? [];
+                    var records = directory?.records ?? [];
+                    final query = iClient.searchQuery.trim();
+                    if (query.isNotEmpty) {
+                      records = records
+                          .where((r) => fuzzyMatch(query, r.name) || fuzzyMatch(query, r.formattedName.toString()))
+                          .toList();
+                    }
                     final groups = records.groupListsBy((element) => element.recordType == RecordType.link || element.recordType == RecordType.directory);
                     final paths = groups[true] ?? [];
                     final objects = groups[false] ?? [];

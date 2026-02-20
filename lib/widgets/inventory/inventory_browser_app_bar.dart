@@ -302,6 +302,16 @@ class _MoveRecordsDialogState extends State<_MoveRecordsDialog> {
 class _InventoryBrowserAppBarState extends State<InventoryBrowserAppBar> {
   final Future<Directory> _tempDirectoryFuture = getTemporaryDirectory();
   bool _creatingRootFolder = false;
+  bool _searchExpanded = false;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
   Future<void> _createFolderInCurrentDirectory(
     InventoryClient iClient,
@@ -368,8 +378,47 @@ class _InventoryBrowserAppBarState extends State<InventoryBrowserAppBar> {
           child: !iClient.isAnyRecordSelected
               ? AppBar(
                   key: const ValueKey("default-appbar"),
-                  title: const Text("Inventory"),
+                  title: _searchExpanded
+                      ? TextField(
+                          controller: _searchController,
+                          focusNode: _searchFocusNode,
+                          autofocus: true,
+                          decoration: InputDecoration(
+                            hintText: "Search (fuzzy)...",
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Theme.of(context).colorScheme.onSurface),
+                          onChanged: (value) => iClient.searchQuery = value,
+                          onSubmitted: (_) => _searchFocusNode.unfocus(),
+                        )
+                      : const Text("Inventory"),
+                  leading: _searchExpanded
+                      ? IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () {
+                            setState(() {
+                              _searchExpanded = false;
+                              _searchController.clear();
+                              iClient.clearSearch();
+                            });
+                          },
+                          tooltip: "Close search",
+                        )
+                      : null,
                   actions: [
+                    if (!_searchExpanded)
+                      IconButton(
+                        icon: const Icon(Icons.search),
+                        tooltip: "Search",
+                        onPressed: () {
+                          setState(() {
+                            _searchExpanded = true;
+                            _searchController.text = iClient.searchQuery;
+                          });
+                        },
+                      ),
                     IconButton(
                       onPressed: _creatingRootFolder
                           ? null
