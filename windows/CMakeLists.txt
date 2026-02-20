@@ -41,6 +41,8 @@ function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_17)
   target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100")
   target_compile_options(${TARGET} PRIVATE /EHsc)
+  # Note: MSVC for x64 builds defaults to baseline x64 architecture (compatible with all x64 CPUs)
+  # No explicit /arch flag needed - MSVC is more conservative than GCC/Clang by default
   target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
   target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
 endfunction()

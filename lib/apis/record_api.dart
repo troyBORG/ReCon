@@ -243,9 +243,7 @@ class RecordApi {
       filename: filename,
       thumbnailUri: imageDigest.dbUri,
       digests: digests,
-      extraTags: ["image"],
-      messageId: messageId,  // Include message ID in tags for message records
-      path: null,  // null path for message records (will serialize as null)
+      extraTags: messageId != null ? ["image", "message_id:$messageId"] : ["image"],
     );
     _logger.info("uploadImage: Record created with ID: ${record.id}, path: ${record.path}, tags: ${record.tags}");
     progressCallback?.call(.1);
@@ -348,9 +346,7 @@ class RecordApi {
       filename: filename,
       thumbnailUri: "",  // Empty string will serialize as null for audio messages
       digests: digests,
-      extraTags: ["voice", "message"],
-      messageId: messageId,  // Include message ID in tags
-      path: null,  // null path for message records (as per docs)
+      extraTags: messageId != null ? ["voice", "message", "message_id:$messageId"] : ["voice", "message"],
     );
     _logger.info("uploadVoiceClip: Record created with ID: ${record.id}, path: ${record.path}, tags: ${record.tags}, thumbnailUri: ${record.thumbnailUri}");
     progressCallback?.call(.1);
@@ -436,9 +432,7 @@ class RecordApi {
       filename: fileDigest.name,
       thumbnailUri: JsonTemplate.thumbUrl,
       digests: digests,
-      extraTags: ["document"],
-      messageId: messageId,  // Include message ID in tags for message records
-      path: null,  // null path for message records
+      extraTags: messageId != null ? ["document", "message_id:$messageId"] : ["document"],
     );
     progressCallback?.call(.1);
     final status = await tryPreprocessRecord(client, record: record);

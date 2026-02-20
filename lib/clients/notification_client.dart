@@ -6,6 +6,7 @@ import 'package:recon/auxiliary.dart';
 import 'package:recon/models/invite_request.dart';
 import 'package:recon/models/message.dart';
 import 'package:recon/models/session.dart';
+import 'package:recon/models/users/friend.dart';
 
 class NotificationChannel {
   final String id;
@@ -22,12 +23,26 @@ class NotificationClient {
     description: "Messages received from your friends",
   );
 
+  static const NotificationChannel _presenceChannel = NotificationChannel(
+    id: "presence",
+    name: "Friend status",
+    description: "When friends come online",
+  );
+
+  /// GUID for Windows toast notification activation (must be stable per app).
+  static const String _windowsNotificationGuid = "{E8F3F8A1-2B4C-5D6E-9A7B-1C2D3E4F5A6B}";
+
   final fln.FlutterLocalNotificationsPlugin _notifier = fln.FlutterLocalNotificationsPlugin()
     ..initialize(const fln.InitializationSettings(
       android: fln.AndroidInitializationSettings("ic_notification"),
       iOS: fln.DarwinInitializationSettings(),
       macOS: fln.DarwinInitializationSettings(),
       linux: fln.LinuxInitializationSettings(defaultActionName: "Open ReCon"),
+      windows: fln.WindowsInitializationSettings(
+        appName: "ReCon",
+        appUserModelId: "ReCon.ReCon.1",
+        guid: _windowsNotificationGuid,
+      ),
     ));
 
   Future<void> showUnreadMessagesNotification(Iterable<Message> messages) async {
@@ -102,5 +117,31 @@ class NotificationClient {
         ),
       );
     }
+  }
+
+  /// Shows an OS notification when a friend comes online (KDE/Plasma, Windows, Android, etc.).
+  Future<void> showFriendCameOnlineNotification(Friend friend) async {
+    final title = "ReCon";
+    final body = "${friend.contactUsername} is now online";
+    // Use a stable id per friend so repeated "came online" replaces the previous notification.
+    final id = "online_${friend.contactUserId}".hashCode & 0x7FFFFFFF;
+    await _notifier.show(
+      id,
+      title,
+      body,
+      fln.NotificationDetails(
+        android: fln.AndroidNotificationDetails(
+          _presenceChannel.id,
+          _presenceChannel.name,
+          channelDescription: _presenceChannel.description,
+          importance: fln.Importance.defaultImportance,
+          priority: fln.Priority.defaultPriority,
+        ),
+        linux: fln.LinuxNotificationDetails(
+          defaultActionName: "Open ReCon",
+        ),
+        windows: fln.WindowsNotificationDetails(),
+      ),
+    );
   }
 }

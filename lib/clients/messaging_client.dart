@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:logging/logging.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -36,6 +36,7 @@ class MessagingClient extends ChangeNotifier {
   final Map<String, Session> _sessionMap = {};
   final Set<String> _knownSessionKeys = {};
   final SettingsClient _settingsClient;
+  final GlobalKey<ScaffoldMessengerState>? _scaffoldMessengerKey;
   Friend? selectedFriend;
 
   Timer? _statusHeartbeat;
@@ -49,9 +50,11 @@ class MessagingClient extends ChangeNotifier {
     required ApiClient apiClient,
     required NotificationClient notificationClient,
     required SettingsClient settingsClient,
+    GlobalKey<ScaffoldMessengerState>? scaffoldMessengerKey,
   })  : _apiClient = apiClient,
         _notificationClient = notificationClient,
-        _settingsClient = settingsClient {
+        _settingsClient = settingsClient,
+        _scaffoldMessengerKey = scaffoldMessengerKey {
     debugPrint("mClient created: $hashCode");
     _apiClient.addLogoutListener(dispose);
     Hive.openBox(_messageBoxKey).then((box) async {
@@ -412,8 +415,12 @@ class MessagingClient extends ChangeNotifier {
     status = status.copyWith(
       decodedSessions: status.sessions.map((e) => sessionMap[e.sessionHash] ?? Session.none().copyWith(accessLevel: e.accessLevel)).toList(),
     );
-    final friend = getAsFriend(statusUpdate["userId"])?.copyWith(userStatus: status);
+    final oldFriend = getAsFriend(statusUpdate["userId"]);
+    final friend = oldFriend?.copyWith(userStatus: status);
     if (friend != null) {
+      if (oldFriend != null && _shouldShowCameOnlineSnackBar(oldFriend, friend)) {
+        _showFriendCameOnline(friend);
+      }
       _updateContact(friend);
     }
     for (final session in status.sessions) {
@@ -422,6 +429,27 @@ class MessagingClient extends ChangeNotifier {
       }
     }
     notifyListeners();
+  }
+
+  bool _shouldShowCameOnlineSnackBar(Friend oldFriend, Friend newFriend) {
+    if (newFriend.isBot || newFriend.isHeadless) return false;
+    return oldFriend.isOffline && !newFriend.isOffline;
+  }
+
+  void _showCameOnlineSnackBar(Friend friend) {
+    _scaffoldMessengerKey?.currentState?.showSnackBar(
+      SnackBar(
+        content: Text('${friend.contactUsername} is now online'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showFriendCameOnline(Friend friend) {
+    if (!_settingsClient.currentSettings.notificationsDenied.valueOrDefault) {
+      _notificationClient.showFriendCameOnlineNotification(friend);
+    }
+    _showCameOnlineSnackBar(friend);
   }
 
   void _onReceiveSessionUpdate(List args) {

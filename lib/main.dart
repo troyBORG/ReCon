@@ -75,6 +75,7 @@ class ReCon extends StatefulWidget {
 class _ReConState extends State<ReCon> {
   final Typography _typography = Typography.material2021(platform: defaultTargetPlatform);
   final ReceivePort _port = ReceivePort();
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   late AuthenticationData _authData = widget.cachedAuthentication;
   bool _checkedForUpdate = false;
 
@@ -212,6 +213,7 @@ class _ReConState extends State<ReCon> {
                   (lightDynamic, darkDynamic) = _generateDynamicColourSchemes(lightDynamic, darkDynamic);
                 }
                 return MaterialApp(
+                  scaffoldMessengerKey: _scaffoldMessengerKey,
                   debugShowCheckedModeBanner: true,
                   title: 'ReCon',
                   theme: ThemeData(
@@ -238,6 +240,7 @@ class _ReConState extends State<ReCon> {
                                     apiClient: clientHolder.apiClient,
                                     settingsClient: clientHolder.settingsClient,
                                     notificationClient: clientHolder.notificationClient,
+                                    scaffoldMessengerKey: _scaffoldMessengerKey,
                                   ),
                                 ),
                                 ChangeNotifierProvider(

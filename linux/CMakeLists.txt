@@ -42,6 +42,9 @@ endif()
 function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_14)
   target_compile_options(${TARGET} PRIVATE -Wall -Werror)
+  # Set CPU architecture to baseline x86-64 for maximum compatibility with older CPUs
+  # This prevents "CPU ISA level is lower than required" errors on older systems
+  target_compile_options(${TARGET} PRIVATE -march=x86-64 -mtune=generic)
   target_compile_options(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:-O3>")
   target_compile_definitions(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:NDEBUG>")
   target_compile_options(${TARGET} PRIVATE -Wno-deprecated)
